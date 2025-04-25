@@ -1,13 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
-    let currentPage = 1;
-    let totalPages = 1;
+    let currentCursor = null;
+    let nextCursor = null;
     
     const elements = {
         gallery: document.getElementById('gallery'),
         loading: document.getElementById('loading'),
         errorContainer: document.getElementById('errorContainer'),
         pagination: document.getElementById('pagination'),
-        paginationInfo: document.getElementById('paginationInfo'),
         nsfw: document.getElementById('nsfw'),
         sort: document.getElementById('sort'),
         period: document.getElementById('period'),
@@ -15,89 +14,150 @@ document.addEventListener('DOMContentLoaded', () => {
         searchButton: document.getElementById('searchButton')
     };
 
-    elements.limit.addEventListener('change', function() {
+    // Инициализация приложения
+    init();
+
+    function init() {
+        elements.limit.addEventListener('change', validateLimit);
+        elements.searchButton.addEventListener('click', handleSearch);
+        loadFirstPage();
+    }
+
+    function validateLimit() {
         let value = parseInt(this.value) || 50;
         this.value = Math.min(200, Math.max(1, value));
-    });
+    }
 
-    elements.searchButton.addEventListener('click', () => {
-        currentPage = 1;
-        fetchImages(currentPage);
-    });
+    function handleSearch() {
+        resetPagination();
+        loadFirstPage();
+    }
 
-    async function fetchImages(page) {
-        // Добавить после получения элементов:
-    elements.searchButton.addEventListener('click', () => {
-        currentPage = 1;
-        fetchImages(currentPage);
-        });
-        elements.loading.style.display = 'block';
-        elements.gallery.innerHTML = '';
+    function resetPagination() {
+        currentCursor = null;
+        nextCursor = null;
         elements.pagination.innerHTML = '';
-        elements.errorContainer.style.display = 'none';
-        
+    }
+
+    async function loadFirstPage() {
+        currentCursor = null;
+        await fetchImages();
+    }
+
+    async function fetchImages() {
         try {
-            const limit = Math.min(200, Math.max(1, parseInt(elements.limit.value) || 50));
-            let apiUrl = `https://civitai.com/api/v1/images?page=${page}&limit=${limit}`;
-            
-            if (elements.nsfw.value !== 'off') {
-                apiUrl += `&nsfw=${elements.nsfw.value}`;
-            }
-            
-            apiUrl += `&sort=${elements.sort.value}`;
-            apiUrl += `&period=${elements.period.value}`;
+            showLoadingState();
+            const apiUrl = buildApiUrl();
+            console.log('API Request:', apiUrl);
 
             const response = await fetch(apiUrl);
             if (!response.ok) throw new Error(`Ошибка ${response.status}`);
             
             const data = await response.json();
+            console.log('API Response:', data);
+
+            if (!data.items?.length) throw new Error('Изображения не найдены');
+            
+            updateCursors(data.metadata);
             displayImages(data.items);
-            updatePagination(page, data.metadata);
+            updateNavigation(data.metadata);
         } catch (error) {
-            elements.errorContainer.style.display = 'block';
-            elements.errorContainer.innerHTML = `<div class="error">${error.message}</div>`;
+            showError(error.message);
         } finally {
-            elements.loading.style.display = 'none';
+            hideLoadingState();
         }
     }
 
+    function buildApiUrl() {
+        const url = new URL('https://civitai.com/api/v1/images');
+        
+        // Параметры пагинации
+        if (currentCursor) url.searchParams.set('cursor', currentCursor);
+        url.searchParams.set('limit', getValidLimit());
+
+        // Параметры фильтров
+        url.searchParams.set('sort', elements.sort.value);
+        url.searchParams.set('period', elements.period.value);
+        url.searchParams.set('nsfw', getNsfwParam());
+
+        return url.toString();
+    }
+
+    function getValidLimit() {
+        return Math.min(200, Math.max(1, parseInt(elements.limit.value) || 50));
+    }
+
+    function getNsfwParam() {
+        const value = elements.nsfw.value;
+        if (value === 'X') return 'true&nsfwLevel=X';
+        if (value === 'off') return 'false';
+        return value;
+    }
+
+    function updateCursors(metadata) {
+        nextCursor = metadata?.nextCursor;
+        console.log('Updated cursors:', { currentCursor, nextCursor });
+    }
+
     function displayImages(images) {
-        elements.gallery.innerHTML = images?.length ? images.map(image => `
+        elements.gallery.innerHTML = images.map(image => `
             <div class="image-card">
                 <div class="image-container">
-                    <img src="${image.url || image.meta?.image || image.resources?.[0]?.url || 'https://via.placeholder.com/250x250?text=No+Image'}" 
-                         alt="${image.meta?.prompt || 'Сгенерированное изображение'}" 
+                    <img src="${getImageSource(image)}" 
+                         alt="${image.meta?.prompt || 'AI изображение'}"
                          loading="lazy">
                 </div>
                 <div class="image-info">
-                    <h3>${image.meta?.prompt?.substring(0, 50) || 'Без названия'}${image.meta?.prompt?.length > 50 ? '...' : ''}</h3>
-                    <p>❤️ ${image.stats?.heartCount || 0} • 💬 ${image.stats?.commentCount || 0}</p>
+                    <h3>${truncateText(image.meta?.prompt, 50)}</h3>
+                    <p>❤️ ${image.stats?.heartCount || 0} | 💬 ${image.stats?.commentCount || 0}</p>
                     <p>Модель: ${image.model?.name || 'Неизвестна'}</p>
                 </div>
             </div>
-        `).join('') : '<p>Изображения не найдены</p>';
+        `).join('');
     }
 
-    function updatePagination(page, metadata) {
-        if (!metadata) return;
+    function getImageSource(image) {
+        return image.url || image.meta?.image || image.resources?.[0]?.url || 'https://via.placeholder.com/250x250?text=No+Image';
+    }
+
+    function truncateText(text, maxLength) {
+        return text?.length > maxLength 
+            ? `${text.substring(0, maxLength)}...` 
+            : text || 'Без названия';
+    }
+
+    function updateNavigation(metadata) {
+        elements.pagination.innerHTML = '';
         
-        totalPages = Math.ceil(metadata.totalItems / metadata.pageSize);
-        elements.paginationInfo.textContent = `Страница ${page} • Всего: ${metadata.totalItems}`;
-        
-        elements.pagination.innerHTML = `
-            <button ${page === 1 ? 'disabled' : ''} onclick="currentPage=${page-1};fetchImages(currentPage)">← Назад</button>
-            ${Array.from({length: Math.min(5, totalPages)}, (_, i) => {
-                const p = Math.max(1, page - 2) + i;
-                return p > totalPages ? '' : `
-                    <button ${p === page ? 'class="current-page"' : ''} 
-                            onclick="currentPage=${p};fetchImages(currentPage)">
-                        ${p}
-                    </button>
-                `;
-            }).join('')}
-            <button ${page >= totalPages ? 'disabled' : ''} onclick="currentPage=${page+1};fetchImages(currentPage)">Вперед →</button>
+        if (metadata?.nextCursor) {
+            const loadMoreButton = document.createElement('button');
+            loadMoreButton.textContent = 'Загрузить ещё';
+            loadMoreButton.className = 'load-more-btn';
+            loadMoreButton.addEventListener('click', () => {
+                currentCursor = nextCursor;
+                fetchImages();
+            });
+            elements.pagination.appendChild(loadMoreButton);
+        }
+    }
+
+    function showLoadingState() {
+        elements.loading.style.display = 'block';
+        elements.gallery.innerHTML = '';
+        elements.errorContainer.style.display = 'none';
+    }
+
+    function hideLoadingState() {
+        elements.loading.style.display = 'none';
+    }
+
+    function showError(message) {
+        elements.errorContainer.style.display = 'block';
+        elements.errorContainer.innerHTML = `
+            <div class="error">
+                <p>${message}</p>
+                <button onclick="window.location.reload()">Перезагрузить</button>
+            </div>
         `;
     }
-
-    fetchImages(currentPage);
 });
