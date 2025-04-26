@@ -15,9 +15,10 @@ document.addEventListener('DOMContentLoaded', () => {
         errorContainer: document.getElementById('errorContainer'),
         nsfw: document.getElementById('nsfw'),
         sort: document.getElementById('sort'),
-        period: document.getElementById('period'),
+        period: document.getElementById('period'), // Важно!
         limit: document.getElementById('limit'),
-        searchButton: document.getElementById('searchButton')
+        searchButton: document.getElementById('searchButton'),
+        modelId: document.getElementById('modelId'), // Важно!
     };
 
     // Инициализация
@@ -39,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nextCursor = null;
         elements.gallery.innerHTML = '';
         isFetching = false;
+        elements.modelId.value = ''; // Очищаем поле при сбросе
     }
 
     async function loadFirstPage() {
@@ -75,11 +77,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildApiUrl() {
         const url = new URL('https://civitai.com/api/v1/images');
+        
+        // Основные параметры
         url.searchParams.set('limit', getValidLimit());
         if (currentCursor) url.searchParams.set('cursor', currentCursor);
+        
+        // Фильтр по ID модели
+        const modelId = elements.modelId.value.trim();
+        if (modelId) url.searchParams.set('modelId', modelId);
+    
+        // Остальные параметры
         url.searchParams.set('sort', elements.sort.value);
         url.searchParams.set('period', elements.period.value);
         url.searchParams.set('nsfw', elements.nsfw.value === 'true');
+    
         return url.toString();
     }
 
