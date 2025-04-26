@@ -1,4 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
+    function truncateText(text, maxLength) {
+        if (!text) return 'Без названия';
+        return text.length > maxLength 
+            ? text.substring(0, maxLength) + '...' 
+            : text;
+    }
     let currentCursor = null;
     let nextCursor = null;
     let isFetching = false;
@@ -81,34 +87,58 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.min(200, Math.max(1, parseInt(elements.limit.value) || 50));
     }
 
-    function displayContent(items) {
-        const parser = new DOMParser();
-        items.forEach(item => {
-            const mediaUrl = item.url || 'https://via.placeholder.com/250';
-            const isVideo = mediaUrl.match(/\.(mp4|webm)$/i);
-            
-            const html = `
-                <div class="media-card">
-                    <div class="media-container">
-                        ${isVideo ? 
-                            `<video controls autoplay muted loop>
-                                <source src="${mediaUrl}" type="video/mp4">
-                            </video>` : 
-                            `<img src="${mediaUrl}" loading="lazy">`
-                        }
-                    </div>
-                    <div class="media-info">
-                        <h3>${item.meta?.prompt?.slice(0, 50) || 'Без названия'}</h3>
-                        <p>❤️ ${item.stats?.heartCount || 0}</p>
-                    </div>
-                </div>
-            `;
+// app.js - обновлённая функция displayContent
+function displayContent(items) {
+    const parser = new DOMParser();
+    
+    items.forEach(item => {
+        const mediaUrl = item.url || 'https://via.placeholder.com/250';
+        const isVideo = mediaUrl.match(/\.(mp4|webm)$/i);
+        const coverUrl = item.coverUrl || 'default-cover.jpg'; // Предполагаем, что API возвращает coverUrl
 
-            elements.gallery.appendChild(
-                parser.parseFromString(html, 'text/html').body.firstChild
-            );
-        });
-    }
+        // Предзагрузка обложки
+        const preloadLink = document.createElement('link');
+        preloadLink.rel = 'preload';
+        preloadLink.as = 'image';
+        preloadLink.href = coverUrl;
+        document.head.appendChild(preloadLink);
+
+        const html = `
+            <div class="media-card">
+                <div class="media-container">
+                    ${isVideo ? `
+                        <video controls muted playsinline
+                            preload="metadata"
+                            poster="${coverUrl}"
+                            onerror="this.parentElement.innerHTML = 'Ошибка загрузки видео'">
+                            <source src="${mediaUrl}" type="video/mp4">
+                        </video>
+                    ` : `
+                        <img src="${mediaUrl}" 
+                             loading="lazy"
+                             onerror="this.src='error-image.png'">
+                    `}
+                </div>
+                <div class="media-info">
+                    <h3>${truncateText(item.meta?.prompt, 50)}</h3>
+                    <p>❤️ ${item.stats?.heartCount || 0}</p>
+                </div>
+            </div>
+        `;
+
+        const card = parser.parseFromString(html, 'text/html').body.firstChild;
+        
+        // Обработка ошибок загрузки обложки
+        if(isVideo) {
+            const video = card.querySelector('video');
+            video.addEventListener('error', () => {
+                video.poster = 'error-image.png';
+            });
+        }
+
+        elements.gallery.appendChild(card);
+    });
+}
 
     function handleScroll() {
         const scrollBottom = window.innerHeight + window.scrollY;
