@@ -1,12 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     let currentCursor = null;
     let nextCursor = null;
-    
+    let isFetching = false;
+
     const elements = {
         gallery: document.getElementById('gallery'),
         loading: document.getElementById('loading'),
         errorContainer: document.getElementById('errorContainer'),
-        pagination: document.getElementById('pagination'),
         nsfw: document.getElementById('nsfw'),
         sort: document.getElementById('sort'),
         period: document.getElementById('period'),
@@ -14,29 +14,25 @@ document.addEventListener('DOMContentLoaded', () => {
         searchButton: document.getElementById('searchButton')
     };
 
-    // Инициализация приложения
+    // Инициализация
     init();
 
     function init() {
-        elements.limit.addEventListener('change', validateLimit);
         elements.searchButton.addEventListener('click', handleSearch);
+        window.addEventListener('scroll', handleScroll);
         loadFirstPage();
-    }
-
-    function validateLimit() {
-        let value = parseInt(this.value) || 50;
-        this.value = Math.min(200, Math.max(1, value));
     }
 
     function handleSearch() {
-        resetPagination();
+        resetState();
         loadFirstPage();
     }
 
-    function resetPagination() {
+    function resetState() {
         currentCursor = null;
         nextCursor = null;
-        elements.pagination.innerHTML = '';
+        elements.gallery.innerHTML = '';
+        isFetching = false;
     }
 
     async function loadFirstPage() {
@@ -45,41 +41,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchImages() {
+        if (isFetching) return;
+        isFetching = true;
+        showLoading();
+
         try {
-            showLoadingState();
             const apiUrl = buildApiUrl();
-            console.log('API Request:', apiUrl);
-
             const response = await fetch(apiUrl);
-            if (!response.ok) throw new Error(`Ошибка ${response.status}`);
             
-            const data = await response.json();
-            console.log('API Response:', data);
+            if (!response.ok) {
+                throw new Error(`Ошибка HTTP: ${response.status}`);
+            }
 
-            if (!data.items?.length) throw new Error('Изображения не найдены');
-            
-            updateCursors(data.metadata);
-            displayImages(data.items);
-            updateNavigation(data.metadata);
+            const data = await response.json();
+            if (!data.items?.length) throw new Error('Нет данных');
+
+            nextCursor = data.metadata?.nextCursor;
+            displayContent(data.items);
+
         } catch (error) {
             showError(error.message);
         } finally {
-            hideLoadingState();
+            isFetching = false;
+            hideLoading();
         }
     }
 
     function buildApiUrl() {
         const url = new URL('https://civitai.com/api/v1/images');
-        
-        // Параметры пагинации
-        if (currentCursor) url.searchParams.set('cursor', currentCursor);
         url.searchParams.set('limit', getValidLimit());
-
-        // Параметры фильтров
+        if (currentCursor) url.searchParams.set('cursor', currentCursor);
         url.searchParams.set('sort', elements.sort.value);
         url.searchParams.set('period', elements.period.value);
-        url.searchParams.set('nsfw', getNsfwParam());
-
+        url.searchParams.set('nsfw', elements.nsfw.value === 'true');
         return url.toString();
     }
 
@@ -87,77 +81,127 @@ document.addEventListener('DOMContentLoaded', () => {
         return Math.min(200, Math.max(1, parseInt(elements.limit.value) || 50));
     }
 
-    function getNsfwParam() {
-        const value = elements.nsfw.value;
-        if (value === 'X') return 'true&nsfwLevel=X';
-        if (value === 'off') return 'false';
-        return value;
-    }
-
-    function updateCursors(metadata) {
-        nextCursor = metadata?.nextCursor;
-        console.log('Updated cursors:', { currentCursor, nextCursor });
-    }
-
-    function displayImages(images) {
-        elements.gallery.innerHTML = images.map(image => `
-            <div class="image-card">
-                <div class="image-container">
-                    <img src="${getImageSource(image)}" 
-                         alt="${image.meta?.prompt || 'AI изображение'}"
-                         loading="lazy">
+    function displayContent(items) {
+        const parser = new DOMParser();
+        items.forEach(item => {
+            const mediaUrl = item.url || 'https://via.placeholder.com/250';
+            const isVideo = mediaUrl.match(/\.(mp4|webm)$/i);
+            
+            const html = `
+                <div class="media-card">
+                    <div class="media-container">
+                        ${isVideo ? 
+                            `<video controls autoplay muted loop>
+                                <source src="${mediaUrl}" type="video/mp4">
+                            </video>` : 
+                            `<img src="${mediaUrl}" loading="lazy">`
+                        }
+                    </div>
+                    <div class="media-info">
+                        <h3>${item.meta?.prompt?.slice(0, 50) || 'Без названия'}</h3>
+                        <p>❤️ ${item.stats?.heartCount || 0}</p>
+                    </div>
                 </div>
-                <div class="image-info">
-                    <h3>${truncateText(image.meta?.prompt, 50)}</h3>
-                    <p>❤️ ${image.stats?.heartCount || 0} | 💬 ${image.stats?.commentCount || 0}</p>
-                    <p>Модель: ${image.model?.name || 'Неизвестна'}</p>
-                </div>
-            </div>
-        `).join('');
+            `;
+
+            elements.gallery.appendChild(
+                parser.parseFromString(html, 'text/html').body.firstChild
+            );
+        });
     }
 
-    function getImageSource(image) {
-        return image.url || image.meta?.image || image.resources?.[0]?.url || 'https://via.placeholder.com/250x250?text=No+Image';
-    }
+    function handleScroll() {
+        const scrollBottom = window.innerHeight + window.scrollY;
+        const pageHeight = document.documentElement.scrollHeight;
+        const threshold = 500;
 
-    function truncateText(text, maxLength) {
-        return text?.length > maxLength 
-            ? `${text.substring(0, maxLength)}...` 
-            : text || 'Без названия';
-    }
-
-    function updateNavigation(metadata) {
-        elements.pagination.innerHTML = '';
-        
-        if (metadata?.nextCursor) {
-            const loadMoreButton = document.createElement('button');
-            loadMoreButton.textContent = 'Загрузить ещё';
-            loadMoreButton.className = 'load-more-btn';
-            loadMoreButton.addEventListener('click', () => {
-                currentCursor = nextCursor;
-                fetchImages();
-            });
-            elements.pagination.appendChild(loadMoreButton);
+        if (pageHeight - scrollBottom < threshold && !isFetching && nextCursor) {
+            currentCursor = nextCursor;
+            fetchImages();
         }
     }
 
-    function showLoadingState() {
+    function showLoading() {
         elements.loading.style.display = 'block';
-        elements.gallery.innerHTML = '';
-        elements.errorContainer.style.display = 'none';
     }
 
-    function hideLoadingState() {
+    function hideLoading() {
         elements.loading.style.display = 'none';
     }
 
     function showError(message) {
-        elements.errorContainer.style.display = 'block';
         elements.errorContainer.innerHTML = `
             <div class="error">
                 <p>${message}</p>
-                <button onclick="window.location.reload()">Перезагрузить</button>
+                <button onclick="window.location.reload()">Обновить</button>
             </div>
         `;
+        elements.errorContainer.style.display = 'block';
     }
+});
+// app.js (дополнения)
+document.addEventListener('DOMContentLoaded', () => {
+    let isAutoScrollActive = false;
+    let scrollInterval = null;
+    const toggleButton = document.getElementById('autoScrollToggle');
+    let lastScrollPosition = 0;
+
+    function initAutoScroll() {
+        toggleButton.addEventListener('click', toggleAutoScroll);
+    }
+
+    function toggleAutoScroll() {
+        isAutoScrollActive = !isAutoScrollActive;
+        toggleButton.classList.toggle('active');
+        toggleButton.textContent = `Автопрокрутка: ${isAutoScrollActive ? 'ВКЛ' : 'ВЫКЛ'}`;
+        
+        if (isAutoScrollActive) {
+            startAutoScroll();
+        } else {
+            stopAutoScroll();
+        }
+    }
+
+    function startAutoScroll() {
+        const scrollSpeed = 25; // Уменьшено для большей плавности
+        const scrollStep = 2.5;   // Увеличен шаг прокрутки
+        
+        // Очистка предыдущего интервала
+        if (scrollInterval) clearInterval(scrollInterval);
+
+        scrollInterval = setInterval(() => {
+            if (!isAutoScrollActive) return;
+            
+            const currentPosition = window.scrollY;
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+
+            // Прокручиваем только если не достигнут конец
+            if (currentPosition < maxScroll) {
+                window.scrollBy({
+                    top: scrollStep,
+                    behavior: 'instant'
+                });
+                
+                // Автоподгрузка контента при приближении к концу
+                if (maxScroll - currentPosition < 1000) {
+                    loadMoreContent();
+                }
+            }
+        }, scrollSpeed);
+    }
+
+    function stopAutoScroll() {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+    }
+
+    // Интеграция с существующей логикой подгрузки
+    async function loadMoreContent() {
+        if (!isFetching && nextCursor) {
+            currentCursor = nextCursor;
+            await fetchImages();
+        }
+    }
+
+    initAutoScroll();
 });

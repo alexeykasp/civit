@@ -80,7 +80,7 @@ button:hover {
     gap: 20px;
 }
 
-.image-card {
+.media-card {
     background-color: white;
     border-radius: 8px;
     overflow: hidden;
@@ -88,36 +88,43 @@ button:hover {
     transition: transform 0.2s;
 }
 
-.image-card:hover {
+.media-card:hover {
     transform: translateY(-5px);
 }
 
-.image-container {
+.media-container {
     width: 100%;
     height: 250px;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    background-color: #000;
 }
 
-.image-card img {
+.media-container img {
     width: 100%;
     height: auto;
     max-height: 250px;
     object-fit: contain;
 }
 
-.image-info {
+.media-container video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.media-info {
     padding: 15px;
 }
 
-.image-info h3 {
+.media-info h3 {
     margin: 0 0 5px 0;
     font-size: 16px;
 }
 
-.image-info p {
+.media-info p {
     margin: 0;
     font-size: 14px;
     color: #666;
@@ -137,34 +144,37 @@ button:hover {
     border-radius: 4px;
     margin-bottom: 20px;
 }
-
-.pagination {
-    display: flex;
-    justify-content: center;
-    margin: 20px 0;
-    gap: 10px;
+/* styles.css (дополнения) */
+.auto-scroll-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    padding: 15px 30px;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    font-size: 16px;
+    transition: all 0.3s, transform 0.2s;
+    z-index: 1001; /* Важное изменение */
 }
 
-.pagination button {
-    min-width: 40px;
+/* Остальные стили без изменений */
+
+.auto-scroll-btn:hover {
+    background-color: #1976D2;
+    transform: scale(1.05);
 }
 
-.pagination-info {
-    text-align: center;
-    margin: 10px 0;
-    color: #666;
+.auto-scroll-btn.active {
+    background-color: #4CAF50;
+    animation: pulse 1.5s infinite;
 }
 
-.current-page {
-    background-color: #2E7D32;
-}
-
-.form-group input[type="number"] {
-    -moz-appearance: textfield;
-}
-
-.form-group input[type="number"]::-webkit-outer-spin-button,
-.form-group input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(76,175,80,0.4); }
+    70% { box-shadow: 0 0 0 15px rgba(76,175,80,0); }
+    100% { box-shadow: 0 0 0 0 rgba(76,175,80,0); }
 }

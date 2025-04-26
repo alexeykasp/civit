@@ -7,17 +7,16 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>CivitAI Галерея изображений</h1>
-    
+    <h1>CivitAI Галерея медиа</h1>
+    <button id="autoScrollToggle" class="auto-scroll-btn">Автопрокрутка: ВЫКЛ</button>
     <div class="controls">
         <div class="filters-row">
             <div class="form-group">
                 <label for="nsfw">Контент:</label>
                 <select id="nsfw">
-                    <option value="off">Все</option>
+                    <option value="">Все</option>
                     <option value="false">Только безопасный</option>
                     <option value="true">Любой NSFW</option>
-                    <option value="X">Только X</option>
                 </select>
             </div>
 
@@ -55,10 +54,8 @@
     </div>
 
     <div id="errorContainer" style="display: none;"></div>
-    <div id="loading" class="loading" style="display: none;">Загрузка изображений...</div>
-    <div id="paginationInfo" class="pagination-info"></div>
+    <div id="loading" class="loading" style="display: none;">Загрузка...</div>
     <div id="gallery" class="gallery"></div>
-    <div id="pagination" class="pagination"></div>
 
     <script src="app.js"></script>
 </body>
