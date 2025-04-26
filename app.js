@@ -204,8 +204,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startAutoScroll() {
-        const scrollSpeed = 25; // Уменьшено для большей плавности
-        const scrollStep = 5;   // Увеличен шаг прокрутки
+        const scrollSpeed = 10; // Уменьшено для большей плавности
+        const scrollStep = 2.5;   // Увеличен шаг прокрутки
         
         // Очистка предыдущего интервала
         if (scrollInterval) clearInterval(scrollInterval);
