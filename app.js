@@ -96,10 +96,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const modelId = elements.modelId.value.trim();
         if (modelId) url.searchParams.set('modelId', modelId);
     
+        // NSFW параметр
+        const nsfwValue = elements.nsfw.value;
+        url.searchParams.set('nsfw', nsfwValue);
+    
         // Остальные параметры
         url.searchParams.set('sort', elements.sort.value);
         url.searchParams.set('period', elements.period.value);
-        url.searchParams.set('nsfw', elements.nsfw.value === 'true');
     
         return url.toString();
     }
@@ -141,7 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="media-info">
                         <h3>${truncateText(item.meta?.prompt, 50)}</h3>
-                        <p>❤️ ${item.stats?.heartCount || 0}</p>
+                        <div class="reaction-counts">
+                            👍 ${item.stats?.likeCount || 0}
+                        </div>
                     </div>
                 </div>
             `;
@@ -219,8 +224,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${item.meta?.seed || 'Нет данных'}
             </div>
             <div class="meta-item">
-                <strong>Reactions:</strong>
-                ❤️ ${item.stats?.heartCount || 0}
+                <strong>Stats:</strong>
+                <div class="stats-details">
+                    👍 ${item.stats?.likeCount || 0} likes<br>
+                    ❤️ ${item.stats?.heartCount || 0} hearts<br>
+                    😢 ${item.stats?.cryCount || 0} cries<br>
+                    😆 ${item.stats?.laughCount || 0} laughs<br>
+                    👎 ${item.stats?.dislikeCount || 0} dislikes<br>
+                    💭 ${item.stats?.commentCount || 0} comments
+                </div>
             </div>
         `;
 
