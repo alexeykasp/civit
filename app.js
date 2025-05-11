@@ -27,6 +27,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const modalMeta = document.getElementById('modalMeta');
     const modalClose = document.querySelector('.modal-close');
 
+    // Auto-scroll variables
+    let isAutoScrollActive = false;
+    let scrollInterval = null;
+    const toggleButton = document.getElementById('autoScrollToggle');
+
     // Инициализация
     init();
 
@@ -37,7 +42,51 @@ document.addEventListener('DOMContentLoaded', () => {
         window.addEventListener('click', (e) => {
             if (e.target === modal) modal.style.display = 'none';
         });
+        
+        // Add auto-scroll initialization
+        toggleButton.addEventListener('click', () => {
+            isAutoScrollActive = !isAutoScrollActive;
+            toggleButton.classList.toggle('active');
+            toggleButton.textContent = `Автопрокрутка: ${isAutoScrollActive ? 'ВКЛ' : 'ВЫКЛ'}`;
+            
+            if (isAutoScrollActive) {
+                startAutoScroll();
+            } else {
+                stopAutoScroll();
+            }
+        });
+
         loadFirstPage();
+    }
+
+    function startAutoScroll() {
+        if (scrollInterval) clearInterval(scrollInterval);
+        
+        scrollInterval = setInterval(() => {
+            if (!isAutoScrollActive) return;
+            
+            const currentPosition = window.scrollY;
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+
+            if (currentPosition < maxScroll) {
+                window.scrollBy({
+                    top: 25,
+                    behavior: 'smooth'  // Можно использовать: 'auto', 'smooth' или 'instant'
+                });
+                
+                if (maxScroll - currentPosition < 1000 && !isFetching && nextCursor) {
+                    currentCursor = nextCursor;
+                    fetchImages();
+                }
+            }
+        }, 10);
+    }
+
+    function stopAutoScroll() {
+        if (scrollInterval) {
+            clearInterval(scrollInterval);
+            scrollInterval = null;
+        }
     }
 
     function handleSearch() {
@@ -268,70 +317,4 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         elements.errorContainer.style.display = 'block';
     }
-});
-// app.js (дополнения)
-document.addEventListener('DOMContentLoaded', () => {
-    let isAutoScrollActive = false;
-    let scrollInterval = null;
-    const toggleButton = document.getElementById('autoScrollToggle');
-    let lastScrollPosition = 0;
-
-    function initAutoScroll() {
-        toggleButton.addEventListener('click', toggleAutoScroll);
-    }
-
-    function toggleAutoScroll() {
-        isAutoScrollActive = !isAutoScrollActive;
-        toggleButton.classList.toggle('active');
-        toggleButton.textContent = `Автопрокрутка: ${isAutoScrollActive ? 'ВКЛ' : 'ВЫКЛ'}`;
-        
-        if (isAutoScrollActive) {
-            startAutoScroll();
-        } else {
-            stopAutoScroll();
-        }
-    }
-
-    function startAutoScroll() {
-        const scrollSpeed = 10; // Уменьшено для большей плавности
-        const scrollStep = 2.5;   // Увеличен шаг прокрутки
-        
-        // Очистка предыдущего интервала
-        if (scrollInterval) clearInterval(scrollInterval);
-
-        scrollInterval = setInterval(() => {
-            if (!isAutoScrollActive) return;
-            
-            const currentPosition = window.scrollY;
-            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-
-            // Прокручиваем только если не достигнут конец
-            if (currentPosition < maxScroll) {
-                window.scrollBy({
-                    top: scrollStep,
-                    behavior: 'instant'
-                });
-                
-                // Автоподгрузка контента при приближении к концу
-                if (maxScroll - currentPosition < 1000) {
-                    loadMoreContent();
-                }
-            }
-        }, scrollSpeed);
-    }
-
-    function stopAutoScroll() {
-        clearInterval(scrollInterval);
-        scrollInterval = null;
-    }
-
-    // Интеграция с существующей логикой подгрузки
-    async function loadMoreContent() {
-        if (!isFetching && nextCursor) {
-            currentCursor = nextCursor;
-            await fetchImages();
-        }
-    }
-
-    initAutoScroll();
 });
